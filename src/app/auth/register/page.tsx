@@ -2,15 +2,13 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Loader2, Heart, CheckCircle2, ArrowRight } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { registerMember } from './actions'
 
 export default function RegisterPage() {
-  const router       = useRouter()
   const searchParams = useSearchParams()
   const redirectTo   = searchParams.get('redirectTo') ?? '/dashboard'
-  const supabase     = createClient()
 
   const [form,    setForm]    = useState({ fullName: '', email: '', phone: '', password: '', affiliation: '' })
   const [showPwd, setShowPwd] = useState(false)
@@ -27,26 +25,16 @@ export default function RegisterPage() {
     setError('')
     setLoading(true)
 
-    const { data: isAdmin } = await supabase.rpc('email_is_admin', { p_email: form.email })
-    if (isAdmin) {
-      setError('Cet email est réservé à un compte administrateur.')
-      setLoading(false)
-      return
-    }
-
-    const { error } = await supabase.auth.signUp({
-      email:    form.email,
-      password: form.password,
-      options: {
-        data: { full_name: form.fullName, phone: form.phone || null, affiliation: form.affiliation || null },
-        emailRedirectTo: `${window.location.origin}/auth/callback?redirectTo=${encodeURIComponent(redirectTo)}`,
-      },
+    const result = await registerMember({
+      email:       form.email,
+      password:    form.password,
+      fullName:    form.fullName,
+      phone:       form.phone,
+      affiliation: form.affiliation,
     })
 
-    if (error) {
-      setError(error.message === 'User already registered'
-        ? 'Un compte existe déjà avec cet email. Connectez-vous.'
-        : error.message)
+    if (result.error) {
+      setError(result.error)
       setLoading(false)
       return
     }
@@ -55,6 +43,7 @@ export default function RegisterPage() {
     setLoading(false)
   }
 
+  /* ── Écran de succès ── */
   if (success) {
     return (
       <div className="text-center">
@@ -62,29 +51,35 @@ export default function RegisterPage() {
           <CheckCircle2 className="w-8 h-8 text-emerald-400" />
         </div>
         <h2 className="text-xl font-bold text-[var(--tx-1)] mb-2">Compte créé !</h2>
-        <p className="text-[var(--tx-3)] text-sm mb-2">
-          Un email de vérification a été envoyé à{' '}
-          <span className="text-[var(--tx-1)] font-medium">{form.email}</span>.
+        <p className="text-[var(--tx-3)] text-sm mb-1">
+          Bienvenue <span className="text-[var(--tx-1)] font-medium">{form.fullName}</span> !
+        </p>
+        <p className="text-[var(--tx-4)] text-xs mb-2">
+          Un email de bienvenue a été envoyé à{' '}
+          <span className="text-[var(--tx-2)]">{form.email}</span>.
         </p>
         <p className="text-[var(--tx-4)] text-xs mb-8">
-          Cliquez sur le lien dans l&apos;email pour activer votre compte, puis connectez-vous.
+          Votre compte est prêt — vous pouvez vous connecter immédiatement.
         </p>
+
         {redirectTo.includes('/donate') && (
           <div className="mb-6 p-3 rounded-xl bg-accent/10 border border-accent/25 text-accent text-xs">
             Votre pack est sauvegardé — vous serez redirigé vers le don après connexion.
           </div>
         )}
+
         <Link
           href={`/auth/login?redirectTo=${encodeURIComponent(redirectTo)}`}
           className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-accent text-white font-bold text-sm hover:bg-accent-hover transition-colors"
         >
           <ArrowRight className="w-4 h-4" />
-          Aller à la connexion
+          Se connecter maintenant
         </Link>
       </div>
     )
   }
 
+  /* ── Formulaire ── */
   return (
     <div>
       {redirectTo.includes('/donate') && (
@@ -110,6 +105,7 @@ export default function RegisterPage() {
           <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/25 text-red-400 text-sm">{error}</div>
         )}
 
+        {/* Nom */}
         <div>
           <label className="block text-sm font-medium text-[var(--tx-2)] mb-2">
             Nom complet <span className="text-red-400">*</span>
@@ -120,6 +116,7 @@ export default function RegisterPage() {
           />
         </div>
 
+        {/* Email */}
         <div>
           <label className="block text-sm font-medium text-[var(--tx-2)] mb-2">
             Email <span className="text-red-400">*</span>
@@ -130,6 +127,7 @@ export default function RegisterPage() {
           />
         </div>
 
+        {/* Téléphone */}
         <div>
           <label className="block text-sm font-medium text-[var(--tx-2)] mb-2">
             Téléphone <span className="text-red-400">*</span>
@@ -140,6 +138,7 @@ export default function RegisterPage() {
           />
         </div>
 
+        {/* Affiliation */}
         <div>
           <label className="block text-sm font-medium text-[var(--tx-2)] mb-2">
             Affiliation <span className="text-red-400">*</span>
@@ -154,6 +153,7 @@ export default function RegisterPage() {
           </select>
         </div>
 
+        {/* Mot de passe */}
         <div>
           <label className="block text-sm font-medium text-[var(--tx-2)] mb-2">
             Mot de passe <span className="text-red-400">*</span>

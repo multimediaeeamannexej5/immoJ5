@@ -155,7 +155,46 @@ export async function sendMonthlyReminderEmail({
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// 3. Test de connexion SMTP (utilitaire admin)
+// 3. Email de bienvenue (création de compte)
+// ══════════════════════════════════════════════════════════════════════════
+export async function sendWelcomeEmail({
+  toEmail,
+  fullName,
+}: {
+  toEmail:  string
+  fullName: string
+}) {
+  const html = emailWrapper(`
+    <h2 style="margin:0 0 8px;color:#0f172a;font-size:22px;">Bienvenue dans la communauté 🎉</h2>
+    <p style="margin:0 0 20px;color:#475569;font-size:14px;">Bonjour <strong>${fullName}</strong>,</p>
+    <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">
+      Votre compte a été créé avec succès sur la plateforme de dons de
+      l&apos;<strong>EEAM Annexe J5</strong>.<br/>
+      Vous pouvez dès maintenant vous connecter et contribuer au projet immobilier.
+    </p>
+    <div style="background:#fef3f2;border:1px solid #fecaca;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+      <p style="margin:0;color:#991b1b;font-size:14px;font-weight:600;">
+        🙏 Merci de rejoindre notre communauté.<br/>
+        <span style="font-weight:400;">Ensemble, nous bâtissons la maison de Dieu !</span>
+      </p>
+    </div>
+    <a href="${SITE}/auth/login" style="${btnStyle}">Accéder à mon espace</a>
+    <p style="margin:24px 0 0;color:#94a3b8;font-size:12px;">
+      Si vous n&apos;avez pas créé ce compte, contactez-nous à
+      <a href="mailto:${process.env.GMAIL_USER}" style="color:#1A7A8A;">${process.env.GMAIL_USER}</a>
+    </p>
+  `)
+
+  await transporter.sendMail({
+    from:    FROM,
+    to:      toEmail,
+    subject: '🙏 Bienvenue sur la plateforme EEAM Annexe J5',
+    html,
+  })
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 4. Test de connexion SMTP (utilitaire admin)
 // ══════════════════════════════════════════════════════════════════════════
 export async function verifyEmailConnection(): Promise<boolean> {
   try {
