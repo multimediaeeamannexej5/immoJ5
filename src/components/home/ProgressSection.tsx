@@ -22,10 +22,10 @@ export default function ProgressSection({ progress }: Props) {
   return (
     <section className="py-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-14">
+        <div className="bg-[#0A0B10] rounded-2xl px-8 py-10 text-center mb-10">
           <span className="text-accent text-sm font-semibold uppercase tracking-widest">Transparence</span>
-          <h2 className="text-3xl sm:text-4xl font-bold text-[var(--tx-1)] mt-2">Progression du Projet</h2>
-          <p className="text-[var(--tx-3)] mt-3 max-w-xl mx-auto">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white mt-2">Progression du Projet</h2>
+          <p className="text-gray-400 mt-3 max-w-xl mx-auto">
             Chaque dirham est compté. Suivez l&apos;évolution de notre collecte en temps réel.
           </p>
         </div>

@@ -43,8 +43,10 @@ export default function FirstTimeDonor({ packs }: { packs: DonationPack[] }) {
     setUploading(true)
 
     const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
     const ext  = file.name.split('.').pop()
-    const path = `monthly/${Date.now()}.${ext}`
+    // RLS policy requires path to start with the user's UUID
+    const path = `${user?.id ?? 'anon'}/${Date.now()}.${ext}`
     const { data, error: upErr } = await supabase.storage
       .from('donation-proofs').upload(path, file, { cacheControl: '3600', upsert: false })
 
@@ -258,9 +260,9 @@ export default function FirstTimeDonor({ packs }: { packs: DonationPack[] }) {
                   </div>
                   <div className="text-center">
                     <p className="text-[var(--tx-2)] text-sm font-medium">Joindre le reçu</p>
-                    <p className="text-[var(--tx-4)] text-xs mt-0.5">JPG, PNG, PDF — max 5 Mo</p>
+                    <p className="text-[var(--tx-4)] text-xs mt-0.5">JPG, PNG, HEIC, PDF — max 5 Mo</p>
                   </div>
-                  <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf"
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
                     onChange={handleProof} className="sr-only" />
                 </label>
               )}

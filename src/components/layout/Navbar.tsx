@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import { Menu, X } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { useTheme } from '@/components/ThemeProvider'
 import type { User } from '@supabase/supabase-js'
 
 export default function Navbar() {
@@ -13,6 +14,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [user,     setUser]     = useState<User | null>(null)
   const supabase = createClient()
+  const { theme } = useTheme()
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20)
@@ -41,8 +43,9 @@ export default function Navbar() {
         scrolled ? 'border-[var(--bd)] shadow-lg shadow-black/10' : 'border-[var(--bd)]/40'
       }`}
       style={{
-        /* Fond solide via CSS var — fonctionne en mode clair ET sombre */
-        backgroundColor: `rgba(var(--bg-base-rgb), ${scrolled ? 0.97 : 0.92})`,
+        backgroundColor: theme === 'light'
+          ? `rgba(255,255,255,${scrolled ? 0.99 : 0.97})`
+          : `rgba(var(--bg-base-rgb),${scrolled ? 0.97 : 0.92})`,
         backdropFilter: 'blur(14px)',
         WebkitBackdropFilter: 'blur(14px)',
       }}
@@ -124,7 +127,10 @@ export default function Navbar() {
       {isOpen && (
         <div
           className="lg:hidden border-t border-[var(--bd)]"
-          style={{ backgroundColor: `rgba(var(--bg-base-rgb), 0.97)`, backdropFilter: 'blur(14px)' }}
+          style={{
+            backgroundColor: theme === 'light' ? 'rgba(255,255,255,0.99)' : 'rgba(var(--bg-base-rgb),0.97)',
+            backdropFilter: 'blur(14px)',
+          }}
         >
           <div className="px-4 py-4 space-y-1">
             {navLinks.map(link => (
