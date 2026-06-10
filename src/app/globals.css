@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Theme tokens ─────────────────────────────────────────────────────────── */
+:root {
+  /* dark mode (default) */
+  --bg-base:   #0A0B10;
+  --bg-card:   #14151E;
+  --bg-hover:  #1E1F2E;
+  --bd:        #252637;
+  --tx-1:      #ffffff;
+  --tx-2:      #d1d5db;
+  --tx-3:      #9ca3af;
+  --tx-4:      #6b7280;
+  --tx-5:      #4b5563;
+  --tx-6:      #374151;
+
+  /* RGB channels for opacity usage: rgba(var(--bg-base-rgb), 0.95) */
+  --bg-base-rgb:  10 11 16;
+  --bg-card-rgb:  20 21 30;
+
+  /* ── Accent EEAM rouge — identique sombre & clair ── */
+  --accent:           #BE1E2D;
+  --accent-hover:     #A31829;
+  --accent-light:     #D42B3A;
+  --accent-rgb:       190 30 45;
+  --accent-hover-rgb: 163 24 41;
+  --accent-light-rgb: 212 43 58;
+
+  /* ── Bleu clair du logo (cercle de la croix) ── */
+  --logo-blue:        #5BC4D5;
+  --logo-blue-rgb:    91 196 213;
+}
+
+[data-theme="light"] {
+  --bg-base:   #f0f3f8;
+  --bg-card:   #ffffff;
+  --bg-hover:  #f3f6fb;
+  --bd:        #dde3ee;
+  --tx-1:      #0f172a;
+  --tx-2:      #1e293b;
+  --tx-3:      #334155;
+  --tx-4:      #475569;
+  --tx-5:      #64748b;
+  --tx-6:      #94a3b8;
+
+  --bg-base-rgb: 240 243 248;
+  --bg-card-rgb: 255 255 255;
+
+  /* accent : même valeur que mode sombre (défini dans :root) */
+}
+
+/* ── Reset ────────────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; padding: 0; margin: 0; }
+
+html, body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  background-color: var(--bg-base);
+  color: var(--tx-1);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ── Custom utilities ─────────────────────────────────────────────────────── */
+@layer utilities {
+  .text-accent      { color: var(--accent); }
+  .bg-accent        { background-color: var(--accent); }
+  .border-accent    { border-color: var(--accent); }
+  .text-logo-blue   { color: var(--logo-blue); }
+  .bg-logo-blue     { background-color: var(--logo-blue); }
+  .border-logo-blue { border-color: var(--logo-blue); }
+  .gradient-accent {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-hover) 50%, var(--accent-light) 100%);
+  }
+  .glass {
+    background: rgba(var(--bg-card-rgb), 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar       { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-card); }
+::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
+
+/* ── Progress bar animation ───────────────────────────────────────────────── */
+@keyframes progress-fill {
+  from { width: 0%; }
+  to   { width: var(--tw-width, 0%); }
+}
+
+/* ── Hero background slideshow ────────────────────────────────────────────── */
+@keyframes hero-img-1 {
+  0%, 27.78%        { opacity: 1; }
+  33.33%, 94.44%    { opacity: 0; }
+  100%              { opacity: 1; }
+}
+@keyframes hero-img-2 {
+  0%, 27.78%        { opacity: 0; }
+  33.33%, 61.11%    { opacity: 1; }
+  66.67%, 100%      { opacity: 0; }
+}
+@keyframes hero-img-3 {
+  0%, 61.11%        { opacity: 0; }
+  66.67%, 94.44%    { opacity: 1; }
+  100%              { opacity: 0; }
+}
+.hero-img-1 {
+  animation: hero-img-1 18s infinite;
+}
+.hero-img-2 {
+  animation: hero-img-2 18s infinite;
+}
+.hero-img-3 {
+  animation: hero-img-3 18s infinite;
+}
