@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { formatMAD, formatNumber, progressPercent, STATUS_LABELS, STATUS_COLORS } from '@/lib/utils'
 import { TrendingUp, Users, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
@@ -6,6 +7,14 @@ export const revalidate = 30
 
 export default async function AdminDashboard() {
   const supabase = await createClient()
+
+  // Finance manager n'a pas accès au dashboard — redirigé vers ses pages
+  const { data: { user } } = await supabase.auth.getUser()
+  if (user) {
+    const { data: adminData } = await supabase
+      .from('admin_users').select('role').eq('id', user.id).single()
+    if (adminData?.role === 'finance_manager') redirect('/admin/donations')
+  }
 
   const [progressRes, statsRes, recentRes] = await Promise.all([
     supabase.from('project_progress').select('*').limit(1).single(),

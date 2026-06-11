@@ -3,7 +3,12 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { sendPaymentConfirmationEmail } from '@/lib/email'
+import {
+  sendPaymentConfirmationEmail,
+  sendRejectionEmail,
+  sendOverdueEmail,
+  sendCompletionEmail,
+} from '@/lib/email'
 
 // ─── Guard : vérifie que l'utilisateur est admin ou trésorier ─────────────
 async function requireAdmin(requiredRole?: 'super_admin') {
@@ -44,26 +49,63 @@ export async function validateDonation(donationId: string, adminNotes?: string) 
 
   if (error) throw error
 
-  // Envoyer l'email de confirmation (non bloquant)
+  // Emails et vérification completion (non bloquant)
   if (donation?.user_id) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('full_name')
       .eq('id', donation.user_id)
       .single()
-    // Récupérer l'email via la table auth (service role requis)
+
     try {
       const adminClient = createAdminClient()
       const { data: userData } = await adminClient.auth.admin.getUserById(donation.user_id)
-      if (userData?.user?.email) {
+      const email = userData?.user?.email
+      const name  = profile?.full_name ?? 'Donateur'
+
+      if (email) {
+        // Confirmation de paiement
         sendPaymentConfirmationEmail({
-          toEmail:    userData.user.email,
-          donorName:  profile?.full_name ?? 'Donateur',
-          amount:     Number(donation.amount),
-          donationId,
-        }).catch(console.error) // fire and forget
+          toEmail: email, donorName: name,
+          amount: Number(donation.amount), donationId,
+        }).catch(console.error)
+
+        // Vérifier si l'engagement est entièrement payé
+        const { data: commitment } = await supabase
+          .from('donor_commitments')
+          .select('id, donation_packs!donor_commitments_pack_id_fkey(name, total_cost)')
+          .eq('user_id', donation.user_id)
+          .neq('status', 'inactive')
+          .maybeSingle()
+
+        // Cast: Supabase FK join peut retourner objet ou tableau
+        const packData = commitment?.donation_packs as unknown as { name: string; total_cost: number } | null
+        if (packData) {
+          const packTotal = Number(packData.total_cost)
+          const { data: allValidated } = await supabase
+            .from('donations')
+            .select('amount')
+            .eq('user_id', donation.user_id)
+            .eq('status', 'validated')
+
+          const totalValidated = (allValidated ?? []).reduce((s: number, d: { amount: number | string }) => s + Number(d.amount), 0)
+
+          if (packTotal > 0 && totalValidated >= packTotal) {
+            // Marquer l'engagement comme complété
+            const commitmentId = (commitment as unknown as { id: string }).id
+            await supabase.from('donor_commitments')
+              .update({ status: 'completed', updated_at: new Date().toISOString() })
+              .eq('id', commitmentId)
+
+            sendCompletionEmail({
+              toEmail: email, donorName: name,
+              packName: packData.name,
+              totalAmount: packTotal,
+            }).catch(console.error)
+          }
+        }
       }
-    } catch { /* email non critique */ }
+    } catch { /* emails non critiques */ }
   }
 
   revalidatePath('/admin/donations')
@@ -76,6 +118,14 @@ export async function validateDonation(donationId: string, adminNotes?: string) 
 // ─── Rejeter un don ──────────────────────────────────────────────────────────
 export async function rejectDonation(donationId: string, adminNotes: string) {
   const { supabase } = await requireAdmin()
+
+  // Fetch donor info before update (for email)
+  const { data: donation } = await supabase
+    .from('donations')
+    .select('amount, user_id')
+    .eq('id', donationId)
+    .single()
+
   const { error } = await supabase.from('donations').update({
     status:      'rejected',
     admin_notes: adminNotes,
@@ -83,6 +133,27 @@ export async function rejectDonation(donationId: string, adminNotes: string) {
   }).eq('id', donationId)
 
   if (error) throw error
+
+  // Email de rejet (non bloquant)
+  if (donation?.user_id) {
+    try {
+      const [profileRes, userData] = await Promise.all([
+        supabase.from('profiles').select('full_name').eq('id', donation.user_id).single(),
+        createAdminClient().auth.admin.getUserById(donation.user_id),
+      ])
+      const email = userData.data?.user?.email
+      if (email) {
+        sendRejectionEmail({
+          toEmail:    email,
+          donorName:  profileRes.data?.full_name ?? 'Donateur',
+          amount:     Number(donation.amount),
+          donationId,
+          adminNotes: adminNotes || undefined,
+        }).catch(console.error)
+      }
+    } catch { /* non critique */ }
+  }
+
   revalidatePath('/admin/donations')
   revalidatePath('/admin/users')
   revalidatePath('/treasurer')
@@ -93,12 +164,40 @@ export async function rejectDonation(donationId: string, adminNotes: string) {
 // ─── Marquer un don comme "en retard" ────────────────────────────────────────
 export async function markDonationOverdue(donationId: string) {
   const { supabase } = await requireAdmin()
+
+  // Fetch donor info before update (for email)
+  const { data: donation } = await supabase
+    .from('donations')
+    .select('amount, user_id')
+    .eq('id', donationId)
+    .single()
+
   const { error } = await supabase.from('donations').update({
     status:     'overdue',
     updated_at: new Date().toISOString(),
   }).eq('id', donationId)
 
   if (error) throw error
+
+  // Email de retard (non bloquant)
+  if (donation?.user_id) {
+    try {
+      const [profileRes, userData] = await Promise.all([
+        supabase.from('profiles').select('full_name').eq('id', donation.user_id).single(),
+        createAdminClient().auth.admin.getUserById(donation.user_id),
+      ])
+      const email = userData.data?.user?.email
+      if (email) {
+        sendOverdueEmail({
+          toEmail:   email,
+          donorName: profileRes.data?.full_name ?? 'Donateur',
+          amount:    Number(donation.amount),
+          donationId,
+        }).catch(console.error)
+      }
+    } catch { /* non critique */ }
+  }
+
   revalidatePath('/admin/donations')
   revalidatePath('/admin/users')
   revalidatePath('/treasurer')

@@ -4,9 +4,20 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import { formatMAD } from '@/lib/utils'
 
-export const metadata = {
-  title: 'À propos — Church Project',
-  description: 'Découvrez le Projet Immobilier de l\'Église Évangélique au Maroc — Annexe J5.',
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'À propos du Projet Immobilier',
+  description:
+    "Découvrez la vision et les objectifs du Projet Immobilier de l'Église Évangélique au Maroc — Annexe J5. Un projet de foi collectif pour bâtir notre lieu de culte permanent.",
+  openGraph: {
+    title:       'À propos du Projet Immobilier | EEAM Annexe J5',
+    description: "La vision, les objectifs et les engagements de l'EEAM Annexe J5 pour son projet de construction.",
+    images: [{ url: '/images/paroisse1.png', alt: 'EEAM Annexe J5' }],
+  },
+  alternates: {
+    canonical: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://eeam-annexej5.ma'}/about`,
+  },
 }
 
 export default function AboutPage() {

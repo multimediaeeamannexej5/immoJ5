@@ -24,7 +24,7 @@ export default function Footer() {
               </span>
             </div>
             <p className="text-[var(--tx-3)] text-sm leading-relaxed">
-              Ensemble, bâtissons notre maison de Dieu. Chaque contribution, grande ou petite, construit notre avenir commun.
+              C&apos;est à nous de bâtir la maison de Dieu. Chaque contribution, grande ou petite, construit notre avenir commun.
             </p>
           </div>
 

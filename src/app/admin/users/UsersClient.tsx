@@ -36,6 +36,8 @@ export type UserRow = {
   packTotal:      number | null
   progressPct:    number | null
   donationsList:  DonorDonation[]
+  hasOverdue:     boolean
+  paidThisMonth:  boolean
 }
 
 /* ── Constants ───────────────────────────────────────────────────── */
@@ -145,8 +147,8 @@ export default function UsersClient({ rows }: { rows: UserRow[] }) {
                   </div>
                 </div>
 
-                {/* Right: affiliation + pending indicator + arrow */}
-                <div className="flex items-center gap-3 flex-shrink-0 ml-4">
+                {/* Right: affiliation + status badges + arrow */}
+                <div className="flex items-center gap-2 flex-shrink-0 ml-4">
                   {p.affiliation ? (
                     <span className={`hidden sm:inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${AFFILIATION_COLORS[p.affiliation]}`}>
                       {AFFILIATION_LABELS[p.affiliation]}
@@ -154,8 +156,19 @@ export default function UsersClient({ rows }: { rows: UserRow[] }) {
                   ) : (
                     <span className="hidden sm:inline text-gray-600 text-xs">—</span>
                   )}
+                  {/* Indicateurs de paiement */}
+                  {p.hasOverdue && (
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-orange-500/15 border border-orange-500/30 text-orange-400 whitespace-nowrap">
+                      Retard
+                    </span>
+                  )}
+                  {p.paidThisMonth && !p.hasOverdue && (
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 whitespace-nowrap">
+                      Payé ce mois
+                    </span>
+                  )}
                   {p.pendingCount > 0 && (
-                    <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-500/15 border border-yellow-500/30 text-yellow-400">
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 whitespace-nowrap">
                       {p.pendingCount} en attente
                     </span>
                   )}

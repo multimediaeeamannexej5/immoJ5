@@ -31,6 +31,9 @@ export default async function TreasurerDonorsPage() {
 
   const { data: profiles } = await profilesQuery
 
+  const now = new Date()
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+
   const rows: UserRow[] = (profiles ?? []).map(p => {
     const rawDons = p.donations
     const allDons: Array<{ id: string; status: string; amount: number; payment_method: string; created_at: string; notes: string | null; proof_url: string | null }> =
@@ -53,6 +56,11 @@ export default async function TreasurerDonorsPage() {
       ? Math.min(100, Math.round(totalValidated / packTotal * 100))
       : null
 
+    const hasOverdue    = allDons.some(d => d.status === 'overdue')
+    const paidThisMonth = allDons.some(
+      d => d.status === 'validated' && d.created_at >= currentMonthStart
+    )
+
     return {
       id:             p.id,
       full_name:      p.full_name,
@@ -70,6 +78,8 @@ export default async function TreasurerDonorsPage() {
       packTotal,
       progressPct,
       donationsList:  allDons,
+      hasOverdue,
+      paidThisMonth,
     }
   })
 

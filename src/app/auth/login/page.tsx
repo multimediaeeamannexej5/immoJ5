@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Eye, EyeOff, Loader2, Heart, ArrowRight, KeyRound, CheckCircle2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { initiate2FA } from '@/app/auth/2fa/actions'
 
 export default function LoginPage() {
   const router       = useRouter()
@@ -37,20 +38,18 @@ export default function LoginPage() {
       return
     }
 
-    const { data: adminData } = await supabase
-      .from('admin_users')
-      .select('role')
-      .eq('id', data.user.id)
-      .single()
-
-    if (adminData?.role === 'treasurer') {
-      router.push('/treasurer')
-    } else if (adminData) {
-      router.push('/admin')
-    } else {
-      router.push(redirectTo.startsWith('/') ? redirectTo : '/dashboard')
+    // Initier la double authentification
+    const tfaResult = await initiate2FA()
+    if (!tfaResult.success) {
+      setError(tfaResult.error ?? "Erreur lors de l'envoi du code de vérification.")
+      setLoading(false)
+      return
     }
-    router.refresh()
+
+    // Rediriger vers la page de vérification 2FA
+    const params = new URLSearchParams()
+    if (tfaResult.maskedEmail) params.set('email', tfaResult.maskedEmail)
+    router.push(`/auth/2fa?${params.toString()}`)
   }
 
   async function handleResetPassword(e: React.FormEvent) {

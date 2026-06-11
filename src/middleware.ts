@@ -25,67 +25,101 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  const isAuthPage        = pathname.startsWith('/auth/')
-  const isAdminRoute      = pathname.startsWith('/admin')
-  const isTreasurerRoute  = pathname.startsWith('/treasurer')
-  const isDonorRoute      = pathname.startsWith('/dashboard') || pathname.startsWith('/donate')
-  const isSuperAdminUrl   = pathname.startsWith('/annexeJ5')
+  const tfa_verified    = request.cookies.get('tfa_v')?.value === '1'
+  const is2FAPage       = pathname === '/auth/2fa'
+  // isAuthPage excludes /auth/2fa (handled separately below)
+  const isAuthPage      = pathname.startsWith('/auth/') && !is2FAPage
+  const isAdminRoute    = pathname.startsWith('/admin')
+  const isTreasurerRoute = pathname.startsWith('/treasurer')
+  const isDonorRoute    = pathname.startsWith('/dashboard') || pathname.startsWith('/donate')
+  const isSuperAdminUrl = pathname.startsWith('/annexeJ5')
+
+  // ── Route /auth/2fa ───────────────────────────────────────────────────────
+  if (is2FAPage) {
+    if (!user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/login'
+      url.search   = ''
+      return NextResponse.redirect(url)
+    }
+    if (tfa_verified) {
+      // Déjà vérifié — rediriger vers la destination
+      const { data: adminData } = await supabase
+        .from('admin_users').select('role').eq('id', user.id).single()
+      const url = request.nextUrl.clone()
+      url.pathname = adminData ? '/admin' : '/dashboard'
+      url.search   = ''
+      return NextResponse.redirect(url)
+    }
+    // Session présente, 2FA non encore validée → afficher la page
+    return supabaseResponse
+  }
 
   // ── Routes protégées donateur ─────────────────────────────────────────────
-  if (isDonorRoute && !user) {
-    const url = request.nextUrl.clone()
-    const fullPath = request.nextUrl.search
-      ? `${pathname}${request.nextUrl.search}`
-      : pathname
-    url.pathname = '/auth/login'
-    url.search   = ''
-    url.searchParams.set('redirectTo', fullPath)
-    return NextResponse.redirect(url)
-  }
-
-  // ── Routes admin protégées ────────────────────────────────────────────────
-  if (isAdminRoute && !user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth/login'
-    return NextResponse.redirect(url)
-  }
-
-  // ── Routes trésorier protégées ────────────────────────────────────────────
-  if (isTreasurerRoute && !user) {
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth/login'
-    return NextResponse.redirect(url)
-  }
-
-  // ── Vérifier que le trésorier a bien le bon rôle ──────────────────────────
-  if (isTreasurerRoute && user) {
-    const { data: adminData } = await supabase
-      .from('admin_users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    if (!adminData || adminData.role !== 'treasurer') {
-      // Super admin ou autre admin → redirigé vers /admin
-      if (adminData) {
-        const url = request.nextUrl.clone()
-        url.pathname = '/admin'
-        return NextResponse.redirect(url)
-      }
-      // Pas admin du tout
+  if (isDonorRoute) {
+    if (!user) {
       const url = request.nextUrl.clone()
-      url.pathname = '/'
+      const fullPath = request.nextUrl.search
+        ? `${pathname}${request.nextUrl.search}`
+        : pathname
+      url.pathname = '/auth/login'
+      url.search   = ''
+      url.searchParams.set('redirectTo', fullPath)
+      return NextResponse.redirect(url)
+    }
+    if (!tfa_verified) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/2fa'
+      url.search   = ''
       return NextResponse.redirect(url)
     }
   }
 
-  // ── /annexeJ5 : redirige si déjà connecté en super_admin ─────────────────
+  // ── Routes admin protégées ────────────────────────────────────────────────
+  if (isAdminRoute) {
+    if (!user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/login'
+      url.search   = ''
+      return NextResponse.redirect(url)
+    }
+    if (!tfa_verified) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/2fa'
+      url.search   = ''
+      return NextResponse.redirect(url)
+    }
+  }
+
+  // ── Routes trésorier : toujours redirigées vers /admin ────────────────────
+  if (isTreasurerRoute) {
+    if (!user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/login'
+      url.search   = ''
+      return NextResponse.redirect(url)
+    }
+    if (!tfa_verified) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/2fa'
+      url.search   = ''
+      return NextResponse.redirect(url)
+    }
+    const url = request.nextUrl.clone()
+    url.pathname = '/admin'
+    return NextResponse.redirect(url)
+  }
+
+  // ── /annexeJ5 : redirige si déjà entièrement connecté ────────────────────
   if (isSuperAdminUrl && user) {
+    if (!tfa_verified) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/2fa'
+      url.search   = ''
+      return NextResponse.redirect(url)
+    }
     const { data: adminData } = await supabase
-      .from('admin_users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+      .from('admin_users').select('role').eq('id', user.id).single()
     if (adminData?.role === 'super_admin') {
       const url = request.nextUrl.clone()
       url.pathname = '/admin'
@@ -95,24 +129,23 @@ export async function middleware(request: NextRequest) {
 
   // ── Pages auth : redirige si déjà connecté ────────────────────────────────
   if (isAuthPage && user) {
+    if (!tfa_verified) {
+      // Session présente mais 2FA non complétée → aller terminer la vérification
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/2fa'
+      url.search   = ''
+      return NextResponse.redirect(url)
+    }
+    // Entièrement connecté → rediriger vers la destination
     const { data: adminData } = await supabase
-      .from('admin_users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+      .from('admin_users').select('role').eq('id', user.id).single()
 
     const url = request.nextUrl.clone()
-    if (adminData?.role === 'treasurer') {
-      url.pathname = '/treasurer'
-      url.search = ''
-      return NextResponse.redirect(url)
-    }
     if (adminData) {
       url.pathname = '/admin'
-      url.search = ''
+      url.search   = ''
       return NextResponse.redirect(url)
     }
-    // Donateur — respecter redirectTo
     const redirectTo = request.nextUrl.searchParams.get('redirectTo')
     if (redirectTo && redirectTo.startsWith('/')) {
       return NextResponse.redirect(new URL(redirectTo, request.nextUrl.origin))

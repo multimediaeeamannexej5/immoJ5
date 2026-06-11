@@ -16,7 +16,7 @@ export default async function TreasurerPage() {
   /* ── Query ───────────────────────────────────────────────────── */
   const { data: donations } = await supabase
     .from('donations')
-    .select('id, amount, type, payment_method, status, proof_url, notes, admin_notes, created_at, profiles(full_name, is_public), donation_packs(name)')
+    .select('id, amount, type, payment_method, status, proof_url, notes, admin_notes, created_at, profiles(full_name, is_public, affiliation), donation_packs(name)')
     .gte('created_at', startOfMonth)
     .order('created_at', { ascending: false })
 

@@ -48,9 +48,9 @@ export default function HeroSection({ progress }: Props) {
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-24 pb-16">
 
         <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-white leading-tight mb-6">
-          Ensemble, Bâtissons{' '}
+          C&apos;est à nous de bâtir{' '}
           <span className="relative">
-            <span className="text-logo-blue">Notre Maison</span>
+            <span className="text-logo-blue">la maison</span>
             <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-[var(--logo-blue)] to-transparent" />
           </span>
           {' '}de Dieu

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import UsersClient from './UsersClient'
 import type { UserRow } from './UsersClient'
 
-export const revalidate = 60
+export const revalidate = 0
 
 export default async function AdminUsersPage() {
   const supabase = await createClient()
@@ -31,6 +31,10 @@ export default async function AdminUsersPage() {
 
   const { data: profiles } = await profilesQuery
 
+  // Début du mois courant pour savoir si le donateur a payé ce mois-ci
+  const now = new Date()
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+
   const rows: UserRow[] = (profiles ?? []).map(p => {
     const rawDons = p.donations
     const allDons: Array<{ id: string; status: string; amount: number; payment_method: string; created_at: string; notes: string | null; proof_url: string | null }> =
@@ -40,6 +44,12 @@ export default async function AdminUsersPage() {
     const pending        = allDons.filter(d => d.status === 'pending')
     const rejected       = allDons.filter(d => d.status === 'rejected')
     const totalValidated = validated.reduce((s, d) => s + Number(d.amount), 0)
+
+    // Indicateurs de paiement pour Finance Manager
+    const hasOverdue    = allDons.some(d => d.status === 'overdue')
+    const paidThisMonth = allDons.some(
+      d => d.status === 'validated' && d.created_at >= currentMonthStart
+    )
 
     // Normalise donor_commitments: PostgREST peut retourner un objet ou un tableau
     const raw = p.donor_commitments
@@ -71,6 +81,8 @@ export default async function AdminUsersPage() {
       packTotal,
       progressPct,
       donationsList:  allDons,
+      hasOverdue,
+      paidThisMonth,
     }
   })
 

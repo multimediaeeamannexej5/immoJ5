@@ -47,7 +47,7 @@ export default async function AuthLayout({ children }: { children: React.ReactNo
         <div className="relative z-10">
           <div className="text-accent/40 text-6xl font-serif leading-none mb-4">&ldquo;</div>
           <p className="text-white text-2xl font-semibold leading-snug mb-3">
-            Ensemble, bâtissons<br />notre Maison de Dieu
+            C&apos;est à nous de bâtir<br />la maison de Dieu
           </p>
           <p className="text-gray-400 text-sm leading-relaxed max-w-xs">
             Chaque dirham donné avec foi devient une brique dans l&apos;édifice de notre communauté.

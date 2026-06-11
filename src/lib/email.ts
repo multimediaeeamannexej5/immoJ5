@@ -3,8 +3,8 @@ import nodemailer from 'nodemailer'
 // ── Transport Gmail ────────────────────────────────────────────────────────
 const transporter = nodemailer.createTransport({
   host:   'smtp.gmail.com',
-  port:   587,
-  secure: false, // STARTTLS
+  port:   465,
+  secure: true, // SSL direct (évite STARTTLS bloqué par certains réseaux)
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD,
@@ -175,7 +175,7 @@ export async function sendWelcomeEmail({
     <div style="background:#fef3f2;border:1px solid #fecaca;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
       <p style="margin:0;color:#991b1b;font-size:14px;font-weight:600;">
         🙏 Merci de rejoindre notre communauté.<br/>
-        <span style="font-weight:400;">Ensemble, nous bâtissons la maison de Dieu !</span>
+        <span style="font-weight:400;">C&apos;est à nous de bâtir la maison de Dieu !</span>
       </p>
     </div>
     <a href="${SITE}/auth/login" style="${btnStyle}">Accéder à mon espace</a>
@@ -194,7 +194,180 @@ export async function sendWelcomeEmail({
 }
 
 // ══════════════════════════════════════════════════════════════════════════
-// 4. Test de connexion SMTP (utilitaire admin)
+// 4. Rejet de paiement
+// ══════════════════════════════════════════════════════════════════════════
+export async function sendRejectionEmail({
+  toEmail, donorName, amount, donationId, adminNotes,
+}: {
+  toEmail:     string
+  donorName:   string
+  amount:      number
+  donationId:  string
+  adminNotes?: string
+}) {
+  const formatted = new Intl.NumberFormat('fr-MA', {
+    style: 'currency', currency: 'MAD', minimumFractionDigits: 2,
+  }).format(amount)
+
+  const html = emailWrapper(`
+    <h2 style="margin:0 0 8px;color:#0f172a;font-size:22px;">Paiement non validé ⚠️</h2>
+    <p style="margin:0 0 20px;color:#475569;font-size:14px;">Bonjour <strong>${donorName}</strong>,</p>
+    <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">
+      Nous avons examiné votre versement de <strong style="color:#BE1E2D;">${formatted}</strong>,
+      mais nous n&apos;avons pas pu le valider.
+    </p>
+    ${adminNotes ? `
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+      <p style="margin:0;color:#9a3412;font-size:13px;">📋 <strong>Motif :</strong> ${adminNotes}</p>
+    </div>` : ''}
+    <p style="margin:0 0 24px;color:#64748b;font-size:13px;">
+      Veuillez soumettre à nouveau votre paiement en vous assurant que le reçu est lisible
+      et correspond au bon montant.<br/>
+      Référence : <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:12px;">${donationId}</code>
+    </p>
+    <a href="${SITE}/donate" style="${btnStyle}">Soumettre à nouveau</a>
+    <p style="margin:24px 0 0;color:#94a3b8;font-size:12px;">
+      Pour toute question : <a href="mailto:${process.env.GMAIL_USER}" style="color:#1A7A8A;">${process.env.GMAIL_USER}</a>
+    </p>
+  `)
+
+  await transporter.sendMail({
+    from:    FROM,
+    to:      toEmail,
+    subject: `⚠️ Votre paiement de ${formatted} n'a pas été validé — EEAM Annexe J5`,
+    html,
+  })
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 5. Paiement en retard
+// ══════════════════════════════════════════════════════════════════════════
+export async function sendOverdueEmail({
+  toEmail, donorName, amount, donationId,
+}: {
+  toEmail:    string
+  donorName:  string
+  amount:     number
+  donationId: string
+}) {
+  const formatted = new Intl.NumberFormat('fr-MA', {
+    style: 'currency', currency: 'MAD', minimumFractionDigits: 2,
+  }).format(amount)
+
+  const html = emailWrapper(`
+    <h2 style="margin:0 0 8px;color:#0f172a;font-size:22px;">Paiement en retard ⏰</h2>
+    <p style="margin:0 0 20px;color:#475569;font-size:14px;">Bonjour <strong>${donorName}</strong>,</p>
+    <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">
+      Votre paiement de <strong style="color:#BE1E2D;">${formatted}</strong> est marqué en retard.
+      Nous vous invitons à régulariser votre situation dès que possible.
+    </p>
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+      <p style="margin:0;color:#9a3412;font-size:13px;">
+        ⏰ Votre engagement mensuel est important pour la progression du projet. Chaque contribution compte !
+      </p>
+    </div>
+    <p style="margin:0 0 24px;color:#64748b;font-size:13px;">
+      Référence : <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:12px;">${donationId}</code>
+    </p>
+    <a href="${SITE}/donate" style="${btnStyle}">Régulariser mon paiement</a>
+    <p style="margin:24px 0 0;color:#94a3b8;font-size:12px;">
+      Pour toute question : <a href="mailto:${process.env.GMAIL_USER}" style="color:#1A7A8A;">${process.env.GMAIL_USER}</a>
+    </p>
+  `)
+
+  await transporter.sendMail({
+    from:    FROM,
+    to:      toEmail,
+    subject: `⏰ Paiement en retard — EEAM Annexe J5`,
+    html,
+  })
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 6. Engagement complété (pack entièrement payé)
+// ══════════════════════════════════════════════════════════════════════════
+export async function sendCompletionEmail({
+  toEmail, donorName, packName, totalAmount,
+}: {
+  toEmail:     string
+  donorName:   string
+  packName:    string
+  totalAmount: number
+}) {
+  const formatted = new Intl.NumberFormat('fr-MA', {
+    style: 'currency', currency: 'MAD', minimumFractionDigits: 2,
+  }).format(totalAmount)
+
+  const html = emailWrapper(`
+    <h2 style="margin:0 0 8px;color:#0f172a;font-size:22px;">Engagement complété 🎉</h2>
+    <p style="margin:0 0 20px;color:#475569;font-size:14px;">Bonjour <strong>${donorName}</strong>,</p>
+    <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">
+      Félicitations ! Vous avez complété votre engagement pour le pack
+      <strong style="color:#1A7A8A;">${packName}</strong>.
+      Votre contribution totale de <strong style="color:#BE1E2D;">${formatted}</strong>
+      a été entièrement validée.
+    </p>
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+      <p style="margin:0;color:#166534;font-size:14px;font-weight:600;">
+        🙏 Merci infiniment pour votre fidélité et votre générosité !<br/>
+        <span style="font-weight:400;">Que Dieu bénisse votre famille et récompense votre sacrifice.</span>
+      </p>
+    </div>
+    <a href="${SITE}/dashboard" style="${btnStyle}">Voir mon tableau de bord</a>
+    <p style="margin:24px 0 0;color:#94a3b8;font-size:12px;">
+      Pour toute question : <a href="mailto:${process.env.GMAIL_USER}" style="color:#1A7A8A;">${process.env.GMAIL_USER}</a>
+    </p>
+  `)
+
+  await transporter.sendMail({
+    from:    FROM,
+    to:      toEmail,
+    subject: `🎉 Engagement complété — Merci ${donorName} ! — EEAM Annexe J5`,
+    html,
+  })
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 7. Code de vérification 2FA
+// ══════════════════════════════════════════════════════════════════════════
+export async function send2FACodeEmail({
+  toEmail,
+  fullName,
+  code,
+}: {
+  toEmail:  string
+  fullName: string
+  code:     string
+}) {
+  const html = emailWrapper(`
+    <h2 style="margin:0 0 8px;color:#0f172a;font-size:22px;">Code de vérification 🔐</h2>
+    <p style="margin:0 0 20px;color:#475569;font-size:14px;">Bonjour <strong>${fullName}</strong>,</p>
+    <p style="margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;">
+      Voici votre code de vérification à usage unique.
+      Il expire dans <strong>10 minutes</strong>.
+    </p>
+    <div style="background:#f8fafc;border:2px solid #1A7A8A;border-radius:16px;padding:28px;text-align:center;margin-bottom:24px;">
+      <div style="font-size:42px;font-weight:800;letter-spacing:14px;color:#0f172a;font-family:monospace;">${code}</div>
+    </div>
+    <p style="margin:0 0 12px;color:#64748b;font-size:13px;">
+      Ne partagez jamais ce code avec quiconque.
+      Si vous n&apos;avez pas tenté de vous connecter, ignorez cet email et changez votre mot de passe.
+    </p>
+    <p style="margin:0;color:#94a3b8;font-size:12px;">
+      Ce code est valable <strong>10 minutes</strong> et ne peut être utilisé qu&apos;une seule fois.
+    </p>
+  `)
+
+  await transporter.sendMail({
+    from:    FROM,
+    to:      toEmail,
+    subject: `🔐 Votre code de connexion : ${code} — EEAM Annexe J5`,
+    html,
+  })
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// 8. Test de connexion SMTP (utilitaire admin)
 // ══════════════════════════════════════════════════════════════════════════
 export async function verifyEmailConnection(): Promise<boolean> {
   try {

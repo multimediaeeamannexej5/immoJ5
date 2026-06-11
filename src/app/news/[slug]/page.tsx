@@ -57,19 +57,98 @@ function formatDate(dateStr: string) {
   })
 }
 
-/* ── Render content: newlines → paragraphs ────────────────────────── */
+/* ── Inline markdown: **bold**, *italic* ──────────────────────────── */
+function renderInline(text: string): React.ReactNode[] {
+  // Split by **bold** and *italic* markers
+  const parts: React.ReactNode[] = []
+  const re = /(\*\*(.+?)\*\*|\*(.+?)\*)/g
+  let last = 0, m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index))
+    if (m[0].startsWith('**')) parts.push(<strong key={m.index}>{m[2]}</strong>)
+    else                       parts.push(<em key={m.index}>{m[3]}</em>)
+    last = m.index + m[0].length
+  }
+  if (last < text.length) parts.push(text.slice(last))
+  return parts
+}
+
+/* ── Render markdown content ──────────────────────────────────────── */
 function renderContent(content: string) {
-  const paragraphs = content.split(/\n{2,}/)
-  return paragraphs.map((para, i) => (
-    <p key={i} className="text-[var(--tx-2)] leading-relaxed text-base sm:text-lg mb-5 last:mb-0">
-      {para.split('\n').map((line, j) => (
-        <span key={j}>
-          {line}
-          {j < para.split('\n').length - 1 && <br />}
-        </span>
-      ))}
-    </p>
-  ))
+  const blocks = content.split(/\n{2,}/)
+  const nodes: React.ReactNode[] = []
+
+  blocks.forEach((block, bi) => {
+    const trimmed = block.trim()
+    if (!trimmed) return
+
+    // Horizontal rule
+    if (/^-{3,}$/.test(trimmed)) {
+      nodes.push(<hr key={bi} className="border-[var(--bd)] my-6" />)
+      return
+    }
+
+    // H2
+    if (trimmed.startsWith('## ')) {
+      nodes.push(
+        <h2 key={bi} className="text-[var(--tx-1)] font-bold text-xl sm:text-2xl mt-8 mb-3">
+          {renderInline(trimmed.slice(3))}
+        </h2>
+      )
+      return
+    }
+
+    // H3
+    if (trimmed.startsWith('### ')) {
+      nodes.push(
+        <h3 key={bi} className="text-[var(--tx-1)] font-semibold text-lg sm:text-xl mt-6 mb-2">
+          {renderInline(trimmed.slice(4))}
+        </h3>
+      )
+      return
+    }
+
+    // Bullet or numbered list (lines starting with "- " or "N. ")
+    const lines = trimmed.split('\n')
+    const isBullet   = lines.every(l => /^- /.test(l.trim()))
+    const isNumbered = lines.every(l => /^\d+\. /.test(l.trim()))
+
+    if (isBullet) {
+      nodes.push(
+        <ul key={bi} className="list-disc list-inside space-y-1 mb-5 text-[var(--tx-2)] text-base sm:text-lg">
+          {lines.map((l, li) => (
+            <li key={li}>{renderInline(l.trim().slice(2))}</li>
+          ))}
+        </ul>
+      )
+      return
+    }
+
+    if (isNumbered) {
+      nodes.push(
+        <ol key={bi} className="list-decimal list-inside space-y-1 mb-5 text-[var(--tx-2)] text-base sm:text-lg">
+          {lines.map((l, li) => (
+            <li key={li}>{renderInline(l.trim().replace(/^\d+\. /, ''))}</li>
+          ))}
+        </ol>
+      )
+      return
+    }
+
+    // Normal paragraph (may contain single \n line breaks)
+    nodes.push(
+      <p key={bi} className="text-[var(--tx-2)] leading-relaxed text-base sm:text-lg mb-5 last:mb-0">
+        {lines.map((line, li) => (
+          <span key={li}>
+            {renderInline(line)}
+            {li < lines.length - 1 && <br />}
+          </span>
+        ))}
+      </p>
+    )
+  })
+
+  return nodes
 }
 
 /* ── Page ─────────────────────────────────────────────────────────── */

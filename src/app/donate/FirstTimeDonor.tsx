@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, Loader2, Upload, X, Heart, ArrowRight } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
 import { createCommitmentAndFirstPayment } from './actions'
 import type { DonationPack } from '@/types'
 import { formatMAD, PAYMENT_METHOD_LABELS } from '@/lib/utils'
+import PaymentContacts from '@/components/donate/PaymentContacts'
+import { convertHeicIfNeeded } from '@/lib/convertHeic'
 
 type Step = 1 | 2 | 3
 
@@ -16,70 +17,69 @@ export default function FirstTimeDonor({ packs }: { packs: DonationPack[] }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
 
-  const [step,        setStep]       = useState<Step>(1)
-  const [packId,      setPackId]     = useState('')
-  const [method,      setMethod]     = useState('')
-  const [monthsCount, setMonths]     = useState(1)
-  const [notes,       setNotes]      = useState('')
-  const [proofFile,   setProofFile]  = useState<File | null>(null)
-  const [proofPreview,setPreview]    = useState<string | null>(null)
-  const [proofUrl,    setProofUrl]   = useState<string | null>(null)
-  const [uploading,   setUploading]  = useState(false)
-  const [error,       setError]      = useState('')
-  const [success,     setSuccess]    = useState(false)
+  const [step,        setStep]      = useState<Step>(1)
+  const [packId,      setPackId]    = useState('')
+  const [method,      setMethod]    = useState('')
+  const [monthsCount, setMonths]    = useState(1)
+  const [notes,       setNotes]     = useState('')
+
+  /* Reçu — stocké localement, envoyé à la soumission (pas d'upload intermédiaire) */
+  const [proofFile,    setProofFile]    = useState<File | null>(null)
+  const [proofPreview, setProofPreview] = useState<string | null>(null)
+  const [converting,   setConverting]   = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const [error,   setError]   = useState('')
+  const [success, setSuccess] = useState(false)
 
   const selectedPack = packs.find(p => p.id === packId)
   const totalAmount  = selectedPack ? Number(selectedPack.monthly_amount) * monthsCount : 0
 
-  /* ── Upload proof ─────────────────────────────────────────────── */
+  /* ── Sélection du fichier (conversion HEIC → JPEG auto si besoin) */
   async function handleProof(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.size > 5 * 1024 * 1024) { setError('Fichier trop grand (max 5 Mo)'); return }
 
-    setProofFile(file)
-    setPreview(URL.createObjectURL(file))
+    setConverting(true)
+    const processed = await convertHeicIfNeeded(file)
+    setConverting(false)
+
+    if (proofPreview) URL.revokeObjectURL(proofPreview)
+    setProofFile(processed)
+    setProofPreview(URL.createObjectURL(processed))
     setError('')
-    setUploading(true)
 
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const ext  = file.name.split('.').pop()
-    // RLS policy requires path to start with the user's UUID
-    const path = `${user?.id ?? 'anon'}/${Date.now()}.${ext}`
-    const { data, error: upErr } = await supabase.storage
-      .from('donation-proofs').upload(path, file, { cacheControl: '3600', upsert: false })
-
-    if (upErr) { setError('Erreur upload : ' + upErr.message); setUploading(false); return }
-    const { data: { publicUrl } } = supabase.storage.from('donation-proofs').getPublicUrl(data.path)
-    setProofUrl(publicUrl)
-    setUploading(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   function removeProof() {
     setProofFile(null)
-    if (proofPreview) URL.revokeObjectURL(proofPreview)
-    setPreview(null)
-    setProofUrl(null)
+    if (proofPreview) { URL.revokeObjectURL(proofPreview); setProofPreview(null) }
   }
 
-  /* ── Submit ───────────────────────────────────────────────────── */
+  /* ── Submit ────────────────────────────────────────────────────── */
   function handleSubmit() {
-    if (!packId)   { setError('Choisissez un pack.'); return }
-    if (!method)   { setError('Choisissez un mode de paiement.'); return }
-    if (!proofUrl) { setError('Veuillez joindre le reçu de paiement.'); return }
+    if (!packId)    { setError('Choisissez un pack.'); return }
+    if (!method)    { setError('Choisissez un mode de paiement.'); return }
+    if (!proofFile) { setError('Veuillez joindre le reçu de paiement.'); return }
     setError('')
 
+    const fd = new FormData()
+    fd.append('packId',      packId)
+    fd.append('method',      method)
+    fd.append('notes',       notes)
+    fd.append('monthsCount', String(monthsCount))
+    fd.append('proof',       proofFile)
+
     startTransition(async () => {
-      const res = await createCommitmentAndFirstPayment({
-        packId, method, proofUrl, notes, monthsCount,
-      })
+      const res = await createCommitmentAndFirstPayment(fd)
       if (res.error) { setError(res.error); return }
       setSuccess(true)
     })
   }
 
-  /* ── Succès ───────────────────────────────────────────────────── */
+  /* ── Succès ─────────────────────────────────────────────────────── */
   if (success) return (
     <div className="flex items-center justify-center min-h-screen px-4 py-28">
       <div className="max-w-md w-full bg-[var(--bg-card)] border border-[var(--bd)] rounded-2xl p-10 text-center">
@@ -215,7 +215,9 @@ export default function FirstTimeDonor({ packs }: { packs: DonationPack[] }) {
 
             {/* Mode de paiement */}
             <div className="mb-5">
-              <label className="block text-sm font-medium text-[var(--tx-2)] mb-2">Mode de paiement <span className="text-red-400">*</span></label>
+              <label className="block text-sm font-medium text-[var(--tx-2)] mb-2">
+                Mode de paiement <span className="text-red-400">*</span>
+              </label>
               <div className="space-y-2">
                 {PAYMENT_METHODS.map(([val, label]) => (
                   <label key={val} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
@@ -229,29 +231,33 @@ export default function FirstTimeDonor({ packs }: { packs: DonationPack[] }) {
               </div>
             </div>
 
-            {/* Preuve de paiement (obligatoire) */}
+            {/* Responsables */}
+            <PaymentContacts />
+
+            {/* Preuve de paiement */}
             <div className="mb-5">
               <label className="block text-sm font-medium text-[var(--tx-2)] mb-2">
                 Reçu de paiement <span className="text-red-400">*</span>
                 <span className="text-[var(--tx-4)] font-normal ml-1">(photo / capture d&apos;écran)</span>
               </label>
+
               {proofPreview ? (
+                /* Aperçu — l'input disparaît une fois l'image choisie */
                 <div className="relative">
-                  <img src={proofPreview} alt="Reçu" className="w-full max-h-48 object-contain rounded-xl border border-accent/40 bg-[var(--bg-base)]" />
+                  <img src={proofPreview} alt="Reçu"
+                    className="w-full max-h-48 object-contain rounded-xl border border-accent/40 bg-[var(--bg-base)]" />
                   <button type="button" onClick={removeProof}
                     className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-500/80 text-white flex items-center justify-center hover:bg-red-500 transition-colors">
                     <X className="w-3.5 h-3.5" />
                   </button>
-                  {uploading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-xl">
-                      <Loader2 className="w-6 h-6 text-white animate-spin" />
-                    </div>
-                  )}
-                  {!uploading && proofUrl && (
-                    <p className="text-emerald-400 text-xs mt-2 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" /> {proofFile?.name}
-                    </p>
-                  )}
+                  <p className="text-emerald-400 text-xs mt-2 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> {proofFile?.name}
+                  </p>
+                </div>
+              ) : converting ? (
+                <div className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-accent/40 rounded-xl bg-accent/5">
+                  <Loader2 className="w-8 h-8 text-accent animate-spin" />
+                  <p className="text-accent text-sm font-medium">Conversion en cours…</p>
                 </div>
               ) : (
                 <label className="flex flex-col items-center gap-3 p-6 border-2 border-dashed border-[var(--bd)] rounded-xl cursor-pointer hover:border-accent/50 transition-colors group">
@@ -262,8 +268,13 @@ export default function FirstTimeDonor({ packs }: { packs: DonationPack[] }) {
                     <p className="text-[var(--tx-2)] text-sm font-medium">Joindre le reçu</p>
                     <p className="text-[var(--tx-4)] text-xs mt-0.5">JPG, PNG, HEIC, PDF — max 5 Mo</p>
                   </div>
-                  <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
-                    onChange={handleProof} className="sr-only" />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf"
+                    onChange={handleProof}
+                    className="sr-only"
+                  />
                 </label>
               )}
             </div>
@@ -283,11 +294,11 @@ export default function FirstTimeDonor({ packs }: { packs: DonationPack[] }) {
                 className="flex-1 py-3 rounded-xl border border-[var(--bd)] text-[var(--tx-3)] text-sm hover:border-accent transition-colors">
                 Retour
               </button>
-              <button onClick={handleSubmit} disabled={pending || uploading}
+              <button onClick={handleSubmit} disabled={pending || converting}
                 className="flex-1 py-3 rounded-xl bg-accent text-white font-bold text-sm hover:bg-accent-hover disabled:opacity-60 transition-colors flex items-center justify-center gap-2">
-                {(pending || uploading) && <Loader2 className="w-4 h-4 animate-spin" />}
+                {pending && <Loader2 className="w-4 h-4 animate-spin" />}
                 <Heart className="w-4 h-4 fill-current" />
-                {uploading ? 'Envoi du reçu…' : pending ? 'Enregistrement…' : 'Confirmer mon engagement'}
+                {pending ? 'Envoi en cours…' : 'Confirmer mon engagement'}
               </button>
             </div>
           </div>

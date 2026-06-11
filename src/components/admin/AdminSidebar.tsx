@@ -19,13 +19,13 @@ type Props = {
 }
 
 const ADMIN_NAV = [
-  { href: '/admin',           icon: LayoutDashboard, label: 'Dashboard',   roles: ['super_admin','finance_manager','communication_manager'] },
-  { href: '/admin/donations', icon: CreditCard,      label: 'Dons',        roles: ['super_admin','finance_manager'] },
-  { href: '/admin/users',     icon: Users,           label: 'Donateurs',   roles: ['super_admin','finance_manager','communication_manager'] },
-  { href: '/admin/admins',    icon: ShieldCheck,     label: 'Admins',      roles: ['super_admin'] },
-  { href: '/admin/progress',  icon: TrendingUp,      label: 'Progression', roles: ['super_admin','finance_manager'] },
-  { href: '/admin/news',        icon: Newspaper,     label: 'Actualités',   roles: ['super_admin','communication_manager'] },
-  { href: '/admin/commitments', icon: CalendarCheck, label: 'Engagements',  roles: ['super_admin','finance_manager','treasurer'] },
+  { href: '/admin',             icon: LayoutDashboard, label: 'Dashboard',   roles: ['super_admin','communication_manager','treasurer'] },
+  { href: '/admin/donations',   icon: CreditCard,      label: 'Dons',        roles: ['super_admin','finance_manager','treasurer'] },
+  { href: '/admin/users',       icon: Users,           label: 'Donateurs',   roles: ['super_admin','finance_manager','communication_manager','treasurer'] },
+  { href: '/admin/admins',      icon: ShieldCheck,     label: 'Admins',      roles: ['super_admin'] },
+  { href: '/admin/progress',    icon: TrendingUp,      label: 'Progression', roles: ['super_admin','finance_manager','treasurer'] },
+  { href: '/admin/news',        icon: Newspaper,       label: 'Actualités',  roles: ['super_admin','communication_manager','treasurer'] },
+  { href: '/admin/commitments', icon: CalendarCheck,   label: 'Engagements', roles: ['super_admin','treasurer'] },
 ] as const
 
 const TREASURER_NAV = [

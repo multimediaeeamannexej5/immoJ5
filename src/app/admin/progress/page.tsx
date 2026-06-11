@@ -8,9 +8,15 @@ export const revalidate = 0
 export default async function AdminProgressPage() {
   const supabase = await createClient()
 
+  // Vérifier le rôle pour affichage conditionnel
+  const { data: { user } } = await supabase.auth.getUser()
+  const { data: adminData } = await supabase
+    .from('admin_users').select('role').eq('id', user?.id ?? '').single()
+  const isReadOnly = adminData?.role === 'finance_manager'
+
   const [progressRes, logsRes] = await Promise.all([
     supabase.from('project_progress').select('*').limit(1).single(),
-    supabase
+    isReadOnly ? Promise.resolve({ data: [] }) : supabase
       .from('manual_progress_logs')
       .select('*, admin_users(full_name)')
       .order('created_at', { ascending: false })
@@ -25,7 +31,9 @@ export default async function AdminProgressPage() {
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">Progression du Projet</h1>
-        <p className="text-gray-400 text-sm mt-1">Mise à jour manuelle des montants collectés</p>
+        <p className="text-gray-400 text-sm mt-1">
+          {isReadOnly ? 'Vue en lecture seule' : 'Mise à jour manuelle des montants collectés'}
+        </p>
       </div>
 
       {/* Current progress */}
@@ -57,21 +65,23 @@ export default async function AdminProgressPage() {
         </div>
       </div>
 
-      {/* Manual update form */}
-      <div className="bg-[#14151E] border border-[#252637] rounded-2xl p-6 mb-6">
-        <h2 className="text-white font-semibold mb-1 flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-accent" />
-          Mise à jour manuelle
-        </h2>
-        <p className="text-gray-500 text-xs mb-5">
-          Pour les paiements en espèces ou non enregistrés dans le système.
-          Entrez un montant positif pour ajouter, négatif pour corriger.
-        </p>
-        <ProgressEditor />
-      </div>
+      {/* Manual update form — masqué pour finance_manager */}
+      {!isReadOnly && (
+        <div className="bg-[#14151E] border border-[#252637] rounded-2xl p-6 mb-6">
+          <h2 className="text-white font-semibold mb-1 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-accent" />
+            Mise à jour manuelle
+          </h2>
+          <p className="text-gray-500 text-xs mb-5">
+            Pour les paiements en espèces ou non enregistrés dans le système.
+            Entrez un montant positif pour ajouter, négatif pour corriger.
+          </p>
+          <ProgressEditor />
+        </div>
+      )}
 
-      {/* Logs */}
-      {logs.length > 0 && (
+      {/* Logs — masqués pour finance_manager */}
+      {!isReadOnly && logs.length > 0 && (
         <div className="bg-[#14151E] border border-[#252637] rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-[#252637] flex items-center gap-2">
             <Clock className="w-4 h-4 text-gray-500" />

@@ -150,7 +150,7 @@ export default function DonorDetailModal({ donor, onClose }: Props) {
                         {PAYMENT_METHOD_LABELS[d.payment_method] ?? d.payment_method}
                       </span>
                       {d.proof_url && (
-                        <a href={d.proof_url} target="_blank" rel="noopener noreferrer"
+                        <a href={`/api/proof?id=${d.id}`} target="_blank" rel="noopener noreferrer"
                           title="Voir la preuve"
                           className="text-accent hover:text-accent/70 flex-shrink-0">
                           <ExternalLink className="w-3 h-3" />

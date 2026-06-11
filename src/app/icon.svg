@@ -1,4 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <rect width="32" height="32" rx="8" fill="#0A0B10"/>
-  <path d="M16 25 C16 25 6 18 6 12 C6 8.7 8.7 6 12 6 C13.8 6 15.4 6.9 16 8.1 C16.6 6.9 18.2 6 20 6 C23.3 6 26 8.7 26 12 C26 18 16 25 16 25Z" fill="var(--accent)"/>
-</svg>

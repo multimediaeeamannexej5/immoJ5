@@ -18,14 +18,22 @@ export default async function AdminDonationsPage() {
   const now          = new Date()
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
   const monthLabel   = now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
-    .replace(/^./, c => c.toUpperCase())                // capitalize first letter
+    .replace(/^./, (c: string) => c.toUpperCase())
+
+  // Finance manager sees all donations (not just current month)
+  const isFinance = adminData?.role === 'finance_manager'
 
   /* ── Query ───────────────────────────────────────────────────── */
-  const { data: donations } = await supabase
+  let donationsQuery = supabase
     .from('donations')
-    .select('id, amount, type, payment_method, status, proof_url, notes, admin_notes, created_at, profiles(full_name, is_public), donation_packs(name)')
-    .gte('created_at', startOfMonth)
+    .select('id, amount, type, payment_method, status, proof_url, notes, admin_notes, created_at, profiles(full_name, is_public, affiliation), donation_packs(name)')
     .order('created_at', { ascending: false })
+
+  if (!isFinance) {
+    donationsQuery = donationsQuery.gte('created_at', startOfMonth)
+  }
+
+  const { data: donations } = await donationsQuery
 
   return (
     <DonationsClient

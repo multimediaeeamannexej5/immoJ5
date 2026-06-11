@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2, Eye, EyeOff } from 'lucide-react'
+import { initiate2FA } from '@/app/auth/2fa/actions'
 
 export default function SuperAdminLoginPage() {
   const router   = useRouter()
@@ -40,8 +41,17 @@ export default function SuperAdminLoginPage() {
       return
     }
 
-    router.push('/admin')
-    router.refresh()
+    // Initier la double authentification
+    const tfaResult = await initiate2FA()
+    if (!tfaResult.success) {
+      setError(tfaResult.error ?? "Erreur lors de l'envoi du code de vérification.")
+      setLoading(false)
+      return
+    }
+
+    const params = new URLSearchParams()
+    if (tfaResult.maskedEmail) params.set('email', tfaResult.maskedEmail)
+    router.push(`/auth/2fa?${params.toString()}`)
   }
 
   return (

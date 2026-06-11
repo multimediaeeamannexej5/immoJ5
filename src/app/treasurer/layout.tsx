@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import AdminSidebar from '@/components/admin/AdminSidebar'
 
 export const metadata = { title: 'Trésorier — Church Project' }
 
@@ -11,25 +10,12 @@ export default async function TreasurerLayout({ children }: { children: React.Re
 
   const { data: admin } = await supabase
     .from('admin_users')
-    .select('role, full_name')
+    .select('role')
     .eq('id', user.id)
     .single()
 
-  if (!admin || admin.role !== 'treasurer') redirect('/')
+  // Le trésorier utilise désormais l'interface admin complète
+  if (admin?.role === 'treasurer') redirect('/admin')
 
-  return (
-    <div className="min-h-screen bg-[#0A0B10]">
-      <AdminSidebar
-        role={admin.role}
-        fullName={admin.full_name}
-        email={user.email!}
-        base="/treasurer"
-      />
-      <div className="lg:pl-60 pt-14 lg:pt-0">
-        <main className="min-h-screen p-6 lg:p-8">
-          {children}
-        </main>
-      </div>
-    </div>
-  )
+  redirect('/')
 }

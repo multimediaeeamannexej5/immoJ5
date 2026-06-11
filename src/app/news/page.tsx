@@ -9,9 +9,19 @@ import type { NewsPost } from '@/types'
 
 export const revalidate = 60
 
-export const metadata = {
-  title: 'Actualités — EEAM Annexe J5',
-  description: 'Suivez les dernières nouvelles du projet immobilier de l\'Église Évangélique au Maroc, Annexe J5.',
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Actualités',
+  description:
+    "Suivez les dernières nouvelles du Projet Immobilier de l'Église Évangélique au Maroc — Annexe J5 : avancement, événements et témoignages de la communauté.",
+  openGraph: {
+    title:       'Actualités | EEAM Annexe J5',
+    description: "Avancement du projet, événements et nouvelles de la communauté EEAM Annexe J5.",
+  },
+  alternates: {
+    canonical: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://eeam-annexej5.ma'}/news`,
+  },
 }
 
 function formatDate(dateStr: string) {

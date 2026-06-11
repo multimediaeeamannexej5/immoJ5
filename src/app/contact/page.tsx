@@ -4,9 +4,19 @@ import { Mail, Phone, MapPin, ExternalLink } from 'lucide-react'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 
-export const metadata = {
-  title: 'Contact — EEAM Annexe J5',
-  description: 'Contactez l\'Église Évangélique au Maroc — Annexe J5. Retrouvez nos contacts à Rabat et pour la diaspora.',
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'Nous contacter',
+  description:
+    "Contactez l'Église Évangélique au Maroc — Annexe J5. Retrouvez nos coordonnées, notre adresse à Rabat et les contacts pour la diaspora.",
+  openGraph: {
+    title:       'Contact | EEAM Annexe J5',
+    description: "Coordonnées et adresse de l'EEAM Annexe J5 à Rabat, Maroc.",
+  },
+  alternates: {
+    canonical: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://eeam-annexej5.ma'}/contact`,
+  },
 }
 
 const CONTACTS = [

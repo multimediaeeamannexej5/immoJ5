@@ -2,9 +2,15 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { X, CheckCircle2, XCircle, AlertTriangle, Loader2, ExternalLink, FileText } from 'lucide-react'
+import { X, CheckCircle2, XCircle, AlertTriangle, Loader2, ExternalLink, FileText, ImageOff } from 'lucide-react'
 import { formatMAD, PAYMENT_METHOD_LABELS, STATUS_LABELS, STATUS_COLORS } from '@/lib/utils'
 import { validateDonation, rejectDonation, markDonationOverdue } from '@/app/admin/actions'
+
+/** Vérifie si l'URL pointe vers un fichier affichable directement dans le navigateur */
+function isRenderableImage(url: string) {
+  const lower = url.toLowerCase().split('?')[0]
+  return /\.(jpe?g|png|webp|gif|svg)$/.test(lower)
+}
 
 export type DonationRow = {
   id:             string
@@ -16,7 +22,7 @@ export type DonationRow = {
   notes:          string | null
   admin_notes:    string | null
   created_at:     string
-  profiles:       { full_name: string | null; is_public: boolean } | null
+  profiles:       { full_name: string | null; is_public: boolean; affiliation?: string | null } | null
   donation_packs: { name: string } | null
 }
 
@@ -28,9 +34,14 @@ type Props = {
 
 export default function DonationModal({ donation, canValidate, onClose }: Props) {
   const router = useRouter()
-  const [note,    setNote]    = useState(donation.admin_notes ?? '')
-  const [loading, setLoading] = useState<string | null>(null)
-  const [done,    setDone]    = useState(false)
+  const [note,      setNote]      = useState(donation.admin_notes ?? '')
+  const [loading,   setLoading]   = useState<string | null>(null)
+  const [done,      setDone]      = useState(false)
+  const [imgFailed, setImgFailed] = useState(false)
+
+  /* Proxy URL — masque le lien Supabase, accessible aux admins authentifiés */
+  const proxyUrl   = `/api/proof?id=${donation.id}`
+  const showInline = !!donation.proof_url && !imgFailed && isRenderableImage(donation.proof_url)
 
   // Rafraîchit la page si une action a été effectuée avant de fermer
   function handleClose() {
@@ -57,7 +68,7 @@ export default function DonationModal({ donation, canValidate, onClose }: Props)
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={handleClose} />
 
-      <div className="relative bg-[#14151E] border border-[#252637] rounded-2xl w-full max-w-md shadow-2xl">
+      <div className="relative bg-[#14151E] border border-[#252637] rounded-2xl w-full max-w-md shadow-2xl max-h-[90dvh] flex flex-col">
 
         {/* ── Header ────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#252637]">
@@ -74,7 +85,7 @@ export default function DonationModal({ donation, canValidate, onClose }: Props)
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 overflow-y-auto flex-1">
 
           {/* ── Status ────────────────────────────────────────── */}
           {done ? (
@@ -109,13 +120,40 @@ export default function DonationModal({ donation, canValidate, onClose }: Props)
             </div>
           </div>
 
-          {/* ── Proof ─────────────────────────────────────────── */}
+          {/* ── Reçu de paiement ──────────────────────────────── */}
           {donation.proof_url && (
-            <a href={donation.proof_url} target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-2 p-3 rounded-xl bg-accent/10 border border-accent/25 text-accent text-sm hover:bg-accent/15 transition-colors">
-              <ExternalLink className="w-4 h-4 flex-shrink-0" />
-              Voir la preuve de paiement
-            </a>
+            <div>
+              <p className="text-gray-500 text-[10px] font-semibold uppercase tracking-wider mb-1.5">
+                Reçu de paiement
+              </p>
+
+              {showInline ? (
+                /* Aperçu inline — via proxy, URL Supabase masquée */
+                <div className="rounded-xl overflow-hidden border border-[#252637] bg-[#0A0B10] mb-2">
+                  <img
+                    src={proxyUrl}
+                    alt="Reçu de paiement"
+                    className="w-full max-h-56 object-contain"
+                    onError={() => setImgFailed(true)}
+                  />
+                </div>
+              ) : (
+                /* Fallback : PDF ou image échouée */
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-[#0A0B10] border border-[#252637] mb-2">
+                  <ImageOff className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                  <span className="text-gray-400 text-sm">
+                    {imgFailed ? 'Format non prévisualisable (PDF)' : 'Fichier non prévisualisable'}
+                  </span>
+                </div>
+              )}
+
+              {/* Lien d'ouverture — toujours via proxy, jamais le lien Supabase direct */}
+              <a href={proxyUrl} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 p-2.5 rounded-xl bg-accent/10 border border-accent/25 text-accent text-sm hover:bg-accent/15 transition-colors">
+                <ExternalLink className="w-4 h-4 flex-shrink-0" />
+                Ouvrir dans un nouvel onglet
+              </a>
+            </div>
           )}
 
           {/* ── Donor note ────────────────────────────────────── */}

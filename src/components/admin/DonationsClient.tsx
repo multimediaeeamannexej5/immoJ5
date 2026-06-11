@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { CreditCard } from 'lucide-react'
+import { CreditCard, Download } from 'lucide-react'
 import { formatMAD, STATUS_LABELS, STATUS_COLORS, PAYMENT_METHOD_LABELS } from '@/lib/utils'
 import DonationModal from './DonationModal'
 import type { DonationRow } from './DonationModal'
@@ -14,7 +14,7 @@ type Props = {
   monthLabel:  string
 }
 
-const TABS = [
+const STATUS_TABS = [
   { key: 'all',       label: 'Tous' },
   { key: 'pending',   label: 'En attente' },
   { key: 'validated', label: 'Validés' },
@@ -22,45 +22,125 @@ const TABS = [
   { key: 'rejected',  label: 'Rejetés' },
 ] as const
 
-type TabKey = typeof TABS[number]['key']
+const AFFILIATION_TABS = [
+  { key: 'all',      label: 'Toutes' },
+  { key: 'centrale', label: 'Centrale' },
+  { key: 'j5',       label: 'Annexe J5' },
+  { key: 'diaspora', label: 'Diaspora' },
+  { key: 'none',     label: 'Non renseignée' },
+] as const
+
+type StatusTabKey = typeof STATUS_TABS[number]['key']
+type AffTabKey    = typeof AFFILIATION_TABS[number]['key']
+
+type DonationRowWithAff = DonationRow & {
+  profiles?: { full_name: string | null; is_public: boolean; affiliation?: string | null } | null
+}
+
+/* ── CSV export ─────────────────────────────────────────────────────────── */
+function exportCSV(rows: DonationRowWithAff[]) {
+  const header = ['Date','Donateur','Affiliation','Pack','Montant','Statut','Mode paiement']
+  const lines  = rows.map(d => [
+    new Date(d.created_at).toLocaleDateString('fr-FR'),
+    d.profiles?.is_public ? (d.profiles.full_name ?? 'Anonyme') : 'Privé',
+    d.profiles?.affiliation ?? '',
+    d.donation_packs?.name ?? '',
+    Number(d.amount).toFixed(2),
+    STATUS_LABELS[d.status] ?? d.status,
+    PAYMENT_METHOD_LABELS[d.payment_method] ?? d.payment_method,
+  ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(','))
+
+  const csv  = [header.join(','), ...lines].join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `dons_${new Date().toISOString().slice(0,10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 export default function DonationsClient({ donations, canValidate, monthLabel }: Props) {
-  const [activeTab, setActiveTab] = useState<TabKey>(canValidate ? 'pending' : 'all')
+  const [statusTab, setStatusTab] = useState<StatusTabKey>(canValidate ? 'pending' : 'all')
+  const [affTab,    setAffTab]    = useState<AffTabKey>('all')
   const [selected,  setSelected]  = useState<DonationRow | null>(null)
 
   const pendingCount = donations.filter(d => d.status === 'pending').length
 
-  const filtered = activeTab === 'all'
-    ? donations
-    : donations.filter(d => d.status === activeTab)
+  const filtered = (donations as DonationRowWithAff[]).filter(d => {
+    const statusMatch = statusTab === 'all' || d.status === statusTab
+    const affMatch    = affTab === 'all'
+      ? true
+      : affTab === 'none'
+      ? !d.profiles?.affiliation
+      : d.profiles?.affiliation === affTab
+    return statusMatch && affMatch
+  })
 
   return (
     <div className="max-w-4xl mx-auto">
 
       {/* ── Header ─────────────────────────────────────────── */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white">
-          {canValidate ? 'Validation des dons' : 'Dons du mois'}
-        </h1>
-        <p className="text-gray-400 text-sm mt-1">
-          {monthLabel} — {donations.length} don{donations.length > 1 ? 's' : ''}
-          {pendingCount > 0 && (
-            <> · <span className="text-yellow-400 font-medium">{pendingCount} en attente</span></>
-          )}
-        </p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-white">
+            {canValidate ? 'Validation des dons' : 'Liste des dons'}
+          </h1>
+          <p className="text-gray-400 text-sm mt-1">
+            {canValidate ? `${monthLabel} — ` : ''}{donations.length} don{donations.length > 1 ? 's' : ''}
+            {pendingCount > 0 && (
+              <> · <span className="text-yellow-400 font-medium">{pendingCount} en attente</span></>
+            )}
+          </p>
+        </div>
+        {/* Export CSV */}
+        <button
+          onClick={() => exportCSV(filtered)}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#14151E] border border-[#252637] text-gray-300 text-sm hover:border-accent/40 hover:text-white transition-colors"
+        >
+          <Download className="w-4 h-4" />
+          Télécharger CSV
+        </button>
+      </div>
+
+      {/* ── Affiliation tabs ────────────────────────────────── */}
+      <div className="flex flex-wrap gap-2 mb-3">
+        {AFFILIATION_TABS.map(tab => {
+          const count = tab.key === 'all'
+            ? donations.length
+            : tab.key === 'none'
+            ? (donations as DonationRowWithAff[]).filter(d => !d.profiles?.affiliation).length
+            : (donations as DonationRowWithAff[]).filter(d => d.profiles?.affiliation === tab.key).length
+          return (
+            <button key={tab.key} onClick={() => setAffTab(tab.key)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all ${
+                affTab === tab.key
+                  ? 'bg-accent/15 text-accent border-accent/30'
+                  : 'bg-[#14151E] text-gray-500 border-[#252637] hover:text-gray-300 hover:border-accent/20'
+              }`}>
+              {tab.label}
+              <span className="ml-1 opacity-60">{count}</span>
+            </button>
+          )
+        })}
       </div>
 
       {/* ── Status tabs ────────────────────────────────────── */}
       <div className="flex flex-wrap gap-2 mb-5">
-        {TABS.map(tab => {
+        {STATUS_TABS.map(tab => {
+          const base = affTab === 'all'
+            ? donations
+            : affTab === 'none'
+            ? (donations as DonationRowWithAff[]).filter(d => !d.profiles?.affiliation)
+            : (donations as DonationRowWithAff[]).filter(d => d.profiles?.affiliation === affTab)
           const count = tab.key === 'all'
-            ? donations.length
-            : donations.filter(d => d.status === tab.key).length
+            ? base.length
+            : base.filter(d => d.status === tab.key).length
           if (count === 0 && tab.key !== 'all') return null
           return (
-            <button key={tab.key} onClick={() => setActiveTab(tab.key)}
+            <button key={tab.key} onClick={() => setStatusTab(tab.key)}
               className={`px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
-                activeTab === tab.key
+                statusTab === tab.key
                   ? 'bg-accent/15 text-accent border-accent/30'
                   : 'bg-[#14151E] text-gray-400 border-[#252637] hover:text-white hover:border-accent/20'
               }`}>
@@ -93,7 +173,7 @@ export default function DonationsClient({ donations, canValidate, monthLabel }: 
                   onClick={() => setSelected(d)}
                   className="flex items-center justify-between px-5 py-4 hover:bg-[#1E1F2E] transition-colors cursor-pointer group">
 
-                  {/* Left: avatar + donor info */}
+                  {/* Left */}
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center flex-shrink-0">
                       <span className="text-accent text-xs font-bold">{initial}</span>
@@ -112,7 +192,7 @@ export default function DonationsClient({ donations, canValidate, monthLabel }: 
                     </div>
                   </div>
 
-                  {/* Right: status + amount + arrow */}
+                  {/* Right */}
                   <div className="flex items-center gap-4 flex-shrink-0 ml-4">
                     <span className={`hidden sm:inline-flex px-2.5 py-1 rounded-full text-xs font-medium border ${STATUS_COLORS[d.status] ?? ''}`}>
                       {STATUS_LABELS[d.status] ?? d.status}
